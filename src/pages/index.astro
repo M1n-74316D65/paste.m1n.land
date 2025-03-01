@@ -6,15 +6,15 @@ import Base from '@/layouts/Base.astro'
 import PostPreview from '@/components/PostPreview.astro'
 
 const allPosts = await getCollection('posts')
-const sortedPosts = allPosts.sort(
-  (a, b) =>
-    // eslint-disable-next-line prettier/prettier
-    new Date(b.data.pubDate).valueOf() - new Date(a.data.pubDate).valueOf()
-)
+const sortedPosts = allPosts.sort((a, b) => {
+  const dateA = new Date(a.data.pubDate)
+  const dateB = new Date(b.data.pubDate)
+  return dateB - dateA // For newest first
+})
 ---
 
 <Base meta={{ title: config.title }}>
-  <div class="w700:grid-cols-1 grid grid-cols-2 gap-5">
+  <div class="grid grid-cols-2 gap-5 w700:grid-cols-1">
     {
       sortedPosts.map((post) => (
         <PostPreview

@@ -1,16 +1,29 @@
 ---
 const { url, title, description, pubDate } = Astro.props
+
+// Function to limit description to 10 words
+const limitDescription = (text) => {
+  const words = text.split(' ')
+  if (words.length > 20) {
+    return words.slice(0, 20).join(' ') + '...'
+  }
+  return text
+}
+
+const truncatedDescription = limitDescription(description)
 ---
 
 <a
   href={url}
   class="rounded-base border-2 border-border bg-main p-4 text-text shadow-light transition-all last:mb-0 hover:translate-x-boxShadowX hover:translate-y-boxShadowY hover:shadow-none dark:border-darkBorder dark:shadow-dark dark:hover:shadow-none"
 >
-  <h2 class="text-xl font-heading w500:text-lg">
+  <h2 class="mt-1 text-xl font-heading w500:text-lg">
     {title}
   </h2>
-  <p class="mb-5 mt-3 w500:text-sm">
-    {description}
+  <p
+    class="mb-5 mt-3 rounded-lg bg-bg p-2 dark:bg-darkBg dark:text-bg w500:text-sm"
+  >
+    {truncatedDescription}
   </p>
   <div class="flex w-max items-center">
     <svg

@@ -11,37 +11,37 @@ export default {
         sans: ['Inter', ...defaultTheme.fontFamily.sans],
       },
       colors: {
-        main: '#FFDC58',
+        main: '#A3E636',
         mainAccent: '#ffc800', // not needed for shadcn components
         overlay: 'rgba(0,0,0,0.8)', // background color overlay for alert dialogs, modals, etc.
 
         // light mode
-        bg: '#FEF2E8',
+        bg: '#E0E7F1',
         text: '#000',
         border: '#000',
 
         // dark mode
-        darkBg: '#374151',
+        darkBg: '#2c312b',
         darkText: '#eeefe9',
         darkBorder: '#000',
         secondaryBlack: '#212121', // opposite of plain white, not used pitch black because borders and box-shadows are that color
       },
       borderRadius: {
-        base: '10px',
+        base: '12px',
       },
       boxShadow: {
-        light: '0px 4px 0px 0px #000',
-        dark: '0px 4px 0px 0px #000',
+        light: '4px 4px 0px 0px #000',
+        dark: '4px 4px 0px 0px #000',
       },
       translate: {
-        boxShadowX: '0px',
+        boxShadowX: '4px',
         boxShadowY: '4px',
-        reverseBoxShadowX: '0px',
+        reverseBoxShadowX: '-4px',
         reverseBoxShadowY: '-4px',
       },
       fontWeight: {
-        base: '400',
-        heading: '600',
+        base: '500',
+        heading: '700',
       },
       screens: {
         w700: { max: '700px' },

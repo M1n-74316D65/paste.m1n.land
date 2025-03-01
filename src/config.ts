@@ -12,12 +12,12 @@ type Config = {
 }
 
 export default {
-  author: 'John Doe',
-  title: 'Neobrutalism blog template',
-  description: 'Lorem ipsum dolor sit amet',
+  author: 'M1n',
+  title: 'M1n Pastebin',
+  description: '',
   lang: 'en',
   themes: {
-    dark: 'github-dark',
-    light: 'github-light',
+    dark: 'everforest-dark',
+    light: 'everforest-light',
   },
 } satisfies Config

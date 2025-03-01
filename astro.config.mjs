@@ -11,7 +11,7 @@ export default defineConfig({
     tailwind(),
     react(),
     expressiveCode({
-      themes: ['github-dark', 'github-light'],
+      themes: ['everforest-dark', 'everforest-light'],
       styleOverrides: {
         frames: {
           editorActiveTabIndicatorTopColor: 'transparent',
@@ -25,5 +25,5 @@ export default defineConfig({
     }),
     mdx(),
   ],
-  site: 'https://neobrutalism-blog.netlify.app/',
+  site: 'https://paste.m1n.land/',
 })

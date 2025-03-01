@@ -1,6 +1,53 @@
 import config from '@/config'
+import { useEffect, useState } from 'react'
 
 export default function ThemeSwitcher() {
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    // Initialize theme
+    const savedTheme = localStorage.getItem('theme')
+
+    if (savedTheme) {
+      const element = document.documentElement
+      const isDark = savedTheme === 'dark'
+      element.classList.toggle('dark', isDark)
+      element.setAttribute(
+        'data-theme',
+        config.themes[isDark ? 'dark' : 'light'],
+      )
+    } else {
+      const prefersDark = window.matchMedia(
+        '(prefers-color-scheme: dark)',
+      ).matches
+      const element = document.documentElement
+      element.classList.toggle('dark', prefersDark)
+      element.setAttribute(
+        'data-theme',
+        config.themes[prefersDark ? 'dark' : 'light'],
+      )
+    }
+
+    // Add listener for system theme changes
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+
+    const handleChange = (e: MediaQueryListEvent) => {
+      if (!localStorage.getItem('theme')) {
+        const element = document.documentElement
+        element.classList.toggle('dark', e.matches)
+        element.setAttribute(
+          'data-theme',
+          config.themes[e.matches ? 'dark' : 'light'],
+        )
+      }
+    }
+
+    mediaQuery.addEventListener('change', handleChange)
+    setMounted(true)
+
+    return () => mediaQuery.removeEventListener('change', handleChange)
+  }, [])
+
   const handleToggleClick = () => {
     const element = document.documentElement
     element.classList.toggle('dark')
@@ -11,6 +58,10 @@ export default function ThemeSwitcher() {
     element.setAttribute('data-theme', config.themes[isDark ? 'dark' : 'light'])
   }
 
+  if (!mounted) {
+    return null // Avoid rendering anything on the server
+  }
+
   return (
     <div className="flex flex-col justify-center">
       <input
@@ -18,6 +69,7 @@ export default function ThemeSwitcher() {
         name="light-switch"
         className="light-switch sr-only"
         id="themeswitcherxd"
+        checked={document.documentElement.classList.contains('dark')}
         onChange={handleToggleClick}
       />
       <label className="relative cursor-pointer" htmlFor="themeswitcherxd">
