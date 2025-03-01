@@ -14,7 +14,7 @@ const sortedPosts = allPosts.sort((a, b) => {
 ---
 
 <Base meta={{ title: config.title }}>
-  <div class="grid grid-cols-2 gap-5 w700:grid-cols-1">
+  <div class="grid grid-cols-3 gap-5 w700:grid-cols-2">
     {
       sortedPosts.map((post) => (
         <PostPreview
