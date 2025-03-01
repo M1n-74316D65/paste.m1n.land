@@ -2,7 +2,7 @@
 const { url, title, description, pubDate } = Astro.props
 
 // Function to limit description to 10 words
-const limitDescription = (text) => {
+const limitDescription = (text: string) => {
   const words = text.split(' ')
   if (words.length > 20) {
     return words.slice(0, 20).join(' ') + '...'
