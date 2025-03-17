@@ -1,21 +1,147 @@
 ---
-import { getCollection } from 'astro:content'
-
+import {
+  getMarkdownGists,
+  getCommentsByGist,
+  getGistPaths,
+} from '@/utils/services'
+import { unified } from 'unified'
+import remarkParse from 'remark-parse'
+import remarkRehype from 'remark-rehype'
+import rehypeStringify from 'rehype-stringify'
+import rehypeRaw from 'rehype-raw'
 import Layout from '@/layouts/BlogPost.astro'
 
-export async function getStaticPaths() {
-  const blogEntries = await getCollection('posts')
+// Define interfaces for better type safety
+interface Comment {
+  body: string
+  user: {
+    login: string
+  }
+  created_at: string
+  renderedBody?: string
+}
 
-  return blogEntries.map((entry) => ({
-    params: { slug: entry.slug },
-    props: { entry }
+interface Article {
+  description: string
+  created_at: string
+  markdownFileName: string
+  markdownContent?: string
+}
+
+// Helper function to format dates as "7 Oct 2024"
+const formatDate = (dateString: string): string => {
+  const date = new Date(dateString)
+  const day = date.getDate()
+  const month = date.toLocaleString('default', { month: 'short' })
+  const year = date.getFullYear()
+  return `${day} ${month} ${year}`
+}
+
+// Helper function to render markdown to HTML
+const renderMarkdown = async (content: string): Promise<string> => {
+  const result = await unified()
+    .use(remarkParse)
+    .use(remarkRehype, { allowDangerousHtml: true })
+    .use(rehypeRaw)
+    .use(rehypeStringify)
+    .process(content || '')
+
+  return result.toString()
+}
+
+// Define the return type for getStaticPaths
+export async function getStaticPaths() {
+  const markdownFileNames = await getGistPaths()
+
+  return markdownFileNames.map((fileName) => ({
+    params: { slug: fileName },
   }))
 }
 
-const { entry } = Astro.props
-const { Content } = await entry.render()
+// Get slug from params
+const { slug } = Astro.params
+
+// Type guard to ensure slug is defined
+if (!slug) {
+  return Astro.redirect('/404')
+}
+
+// Fetch data
+const markdownGists = await getMarkdownGists()
+const article = markdownGists.find((gist) => gist.markdownFileName === slug)
+
+// Handle 404 case
+if (!article) {
+  return Astro.redirect('/404')
+}
+
+// Fetch and process comments
+const comments = await getCommentsByGist(article)
+const processedComments = await Promise.all(
+  comments.map(async (comment) => ({
+    ...comment,
+    renderedBody: await renderMarkdown(comment.body),
+  })),
+)
+
+// Format article date
+const formattedDate = formatDate(article.created_at)
+
+// Create frontmatter object
+const frontmatter = {
+  title: article.description,
+  pubDate: formattedDate,
+}
+
+// Process the main article content
+const renderedArticleContent = await renderMarkdown(
+  article.markdownContent || '',
+)
 ---
 
-<Layout frontmatter={entry.data}>
-  <Content />
+<Layout frontmatter={frontmatter}>
+  <article class="mb-6">
+    <div
+      class="prose max-w-none dark:prose-invert"
+      set:html={renderedArticleContent}
+    />
+  </article>
+
+  {
+    processedComments.length > 0 && (
+      <section class="my-10">
+        <h2 class="mb-6 text-2xl font-bold">Comments</h2>
+
+        <div class="space-y-6">
+          {processedComments.map((comment) => (
+            <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+              <header class="mb-4 flex items-center">
+                <img
+                  src={`https://github.com/${comment.user.login}.png`}
+                  alt={`${comment.user.login}'s avatar`}
+                  class="mr-4 h-10 w-10 rounded-full"
+                  loading="lazy"
+                />
+                <div>
+                  <h3 class="font-semibold text-text dark:text-darkText">
+                    {comment.user.login}
+                  </h3>
+                  <time
+                    datetime={comment.created_at}
+                    class="text-sm text-gray-500"
+                  >
+                    {formatDate(comment.created_at)}
+                  </time>
+                </div>
+              </header>
+              <div
+                class="prose max-w-none dark:prose-invert"
+                set:html={comment.renderedBody}
+              />
+            </div>
+          ))}
+        </div>
+      </section>
+    )
+  }
 </Layout>
