@@ -1,26 +1,30 @@
 ---
 import config from '@/config'
-import { getCollection } from 'astro:content'
 import { getMarkdownGists } from '../utils/services'
-import type { Gist } from '../utils/services'
 import List from '@/components/List.astro'
 import Base from '@/layouts/Base.astro'
-import PostPreview from '@/components/PostPreview.astro'
 
-// Fetch the markdown gists during Astro's build process
+// Use await directly in the component script section
 const articles = await getMarkdownGists()
+
+// Add proper typing for the meta object
+type MetaProps = {
+  title: string
+}
 ---
 
-<Base meta={{ title: config.title }}>
-  <div class="grid grid-cols-3 gap-5 w700:grid-cols-2">
+<Base meta={{ title: config.title } satisfies MetaProps}>
+  <main>
     {
       articles.length > 0 ? (
-        <List data={articles} />
+        <div class="grid grid-cols-3 gap-5 sm:grid-cols-1 md:grid-cols-2">
+          <List data={articles} />
+        </div>
       ) : (
-        <div class="flex h-screen items-center justify-center">
+        <div class="flex min-h-[50vh] items-center justify-center">
           <h1 class="text-2xl font-bold text-gray-500">No Gists Found</h1>
         </div>
       )
     }
-  </div>
+  </main>
 </Base>

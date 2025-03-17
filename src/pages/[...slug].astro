@@ -11,8 +11,25 @@ import rehypeStringify from 'rehype-stringify'
 import rehypeRaw from 'rehype-raw'
 import Layout from '@/layouts/BlogPost.astro'
 
+// Define interfaces for better type safety
+interface Comment {
+  body: string
+  user: {
+    login: string
+  }
+  created_at: string
+  renderedBody?: string
+}
+
+interface Article {
+  description: string
+  created_at: string
+  markdownFileName: string
+  markdownContent?: string
+}
+
 // Helper function to format dates as "7 Oct 2024"
-function formatDate(dateString: string): string {
+const formatDate = (dateString: string): string => {
   const date = new Date(dateString)
   const day = date.getDate()
   const month = date.toLocaleString('default', { month: 'short' })
@@ -21,27 +38,27 @@ function formatDate(dateString: string): string {
 }
 
 // Helper function to render markdown to HTML
-async function renderMarkdown(content: string): Promise<string> {
+const renderMarkdown = async (content: string): Promise<string> => {
   const result = await unified()
     .use(remarkParse)
     .use(remarkRehype, { allowDangerousHtml: true })
-    .use(rehypeRaw) // Added to preserve raw HTML
+    .use(rehypeRaw)
     .use(rehypeStringify)
-    .process(content)
+    .process(content || '')
+
   return result.toString()
 }
 
-// Define the correct return type for getStaticPaths with properly formatted return value
+// Define the return type for getStaticPaths
 export async function getStaticPaths() {
   const markdownFileNames = await getGistPaths()
 
-  // Return the correct format - each fileName should be a simple string
   return markdownFileNames.map((fileName) => ({
     params: { slug: fileName },
   }))
 }
 
-// Correctly access the slug parameter
+// Get slug from params
 const { slug } = Astro.params
 
 // Type guard to ensure slug is defined
@@ -49,6 +66,7 @@ if (!slug) {
   return Astro.redirect('/404')
 }
 
+// Fetch data
 const markdownGists = await getMarkdownGists()
 const article = markdownGists.find((gist) => gist.markdownFileName === slug)
 
@@ -57,9 +75,8 @@ if (!article) {
   return Astro.redirect('/404')
 }
 
+// Fetch and process comments
 const comments = await getCommentsByGist(article)
-
-// Process all comment bodies to convert markdown to HTML
 const processedComments = await Promise.all(
   comments.map(async (comment) => ({
     ...comment,
@@ -67,54 +84,56 @@ const processedComments = await Promise.all(
   })),
 )
 
-// Format the date in the desired format
+// Format article date
 const formattedDate = formatDate(article.created_at)
 
-// Create frontmatter object to pass to the Layout
+// Create frontmatter object
 const frontmatter = {
   title: article.description,
   pubDate: formattedDate,
 }
 
-// Also process the main article content
+// Process the main article content
 const renderedArticleContent = await renderMarkdown(
   article.markdownContent || '',
 )
 ---
 
 <Layout frontmatter={frontmatter}>
-  <!-- The post content goes here, which will be placed in the slot of the Layout -->
-  <div class="mb-6">
-    <!-- Apply proper styling to ensure content renders correctly -->
+  <article class="mb-6">
     <div
       class="prose max-w-none dark:prose-invert"
       set:html={renderedArticleContent}
     />
-  </div>
+  </article>
 
   {
-    comments.length > 0 && (
-      <div class="my-10">
+    processedComments.length > 0 && (
+      <section class="my-10">
         <h2 class="mb-6 text-2xl font-bold">Comments</h2>
 
         <div class="space-y-6">
           {processedComments.map((comment) => (
             <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-              <div class="mb-4 flex items-center">
+              <header class="mb-4 flex items-center">
                 <img
                   src={`https://github.com/${comment.user.login}.png`}
-                  alt={comment.user.login}
+                  alt={`${comment.user.login}'s avatar`}
                   class="mr-4 h-10 w-10 rounded-full"
+                  loading="lazy"
                 />
                 <div>
-                  <div class="font-semibold text-text dark:text-darkText">
+                  <h3 class="font-semibold text-text dark:text-darkText">
                     {comment.user.login}
-                  </div>
-                  <div class="text-sm text-gray-500">
+                  </h3>
+                  <time
+                    datetime={comment.created_at}
+                    class="text-sm text-gray-500"
+                  >
                     {formatDate(comment.created_at)}
-                  </div>
+                  </time>
                 </div>
-              </div>
+              </header>
               <div
                 class="prose max-w-none dark:prose-invert"
                 set:html={comment.renderedBody}
@@ -122,7 +141,7 @@ const renderedArticleContent = await renderMarkdown(
             </div>
           ))}
         </div>
-      </div>
+      </section>
     )
   }
 </Layout>

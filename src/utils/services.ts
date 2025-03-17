@@ -2,13 +2,7 @@ import { slugify } from './helpers'
 import { calculateReadingTime, convertDate, fetchRawUrl } from './functions'
 import matter from 'gray-matter'
 
-// In Astro, environment variables are accessed via import.meta.env
-const GITHUB_NAME = import.meta.env.GITHUB_NAME
-
-const HEADER = {
-  Authorization: `token ${import.meta.env.GITHUB_TOKEN}`,
-}
-
+// Type Definitions
 export interface Repo {
   name: string
   description: string
@@ -23,15 +17,17 @@ export type MetaData = {
   tags?: string[]
 }
 
+export interface FileObject {
+  filename: string
+  type: string
+  language: string
+  raw_url: string
+  size: number
+  content: string
+}
+
 export interface File {
-  [key: string]: {
-    filename: string
-    type: string
-    language: string
-    raw_url: string
-    size: number
-    content: string
-  }
+  [key: string]: FileObject
 }
 
 export interface Gist {
@@ -42,14 +38,14 @@ export interface Gist {
   created_at: string
   comments: number
   comments_url: string
-  markdownFileName: string
-  rawContent: string
-  rawUrl: string
-  title: string
-  metaData: MetaData
-  readingTime: string
-  articleDate: string
-  markdownContent: string
+  markdownFileName?: string
+  rawContent?: string
+  rawUrl?: string
+  title?: string
+  metaData?: MetaData
+  readingTime?: string
+  articleDate?: string
+  markdownContent?: string
 }
 
 export interface User {
@@ -80,108 +76,187 @@ export interface Comment {
   created_at: string
 }
 
-export const getRepos = async () => {
-  const res = await fetch(`https://api.github.com/users/${GITHUB_NAME}/repos`, {
-    headers: HEADER,
-  })
-  const repos = (await res.json()) as Repo[]
-  return repos.sort((a, b) => {
-    return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-  })
+// Config
+const GITHUB_NAME = import.meta.env.GITHUB_NAME
+const GITHUB_TOKEN = import.meta.env.GITHUB_TOKEN
+
+const HEADERS = {
+  Authorization: `token ${GITHUB_TOKEN}`,
+  Accept: 'application/vnd.github+json',
+  'X-GitHub-Api-Version': '2022-11-28',
 }
 
-export async function getGists(): Promise<Gist[]> {
+// API endpoints
+const GITHUB_API_BASE = 'https://api.github.com'
+const REPOS_ENDPOINT = `${GITHUB_API_BASE}/users/${GITHUB_NAME}/repos`
+const GISTS_ENDPOINT = `${GITHUB_API_BASE}/users/${GITHUB_NAME}/gists`
+const USER_ENDPOINT = `${GITHUB_API_BASE}/users/${GITHUB_NAME}`
+
+/**
+ * Fetches repositories sorted by most recently updated
+ */
+export const getRepos = async (): Promise<Repo[]> => {
   try {
-    const response = await fetch(
-      `https://api.github.com/users/${GITHUB_NAME}/gists`,
-      {
-        headers: HEADER,
-      },
-    )
+    const response = await fetch(REPOS_ENDPOINT, { headers: HEADERS })
 
     if (!response.ok) {
       console.error(
         `GitHub API error: ${response.status} ${response.statusText}`,
       )
-      return [] // Return empty array instead of throwing
+      return []
+    }
+
+    const repos = (await response.json()) as Repo[]
+
+    return repos.sort(
+      (a, b) =>
+        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+    )
+  } catch (error) {
+    console.error('Failed to fetch repositories:', error)
+    return []
+  }
+}
+
+/**
+ * Fetches all gists from GitHub
+ */
+export async function getGists(): Promise<Gist[]> {
+  try {
+    const response = await fetch(GISTS_ENDPOINT, { headers: HEADERS })
+
+    if (!response.ok) {
+      console.error(
+        `GitHub API error: ${response.status} ${response.statusText}`,
+      )
+      return []
     }
 
     const data = await response.json()
 
-    // Check if data is an array before returning
     if (!Array.isArray(data)) {
       console.error("GitHub API didn't return an array:", data)
       return []
     }
 
-    return data
+    return data as Gist[]
   } catch (error) {
     console.error('Failed to fetch gists:', error)
-    return [] // Return empty array on error
+    return []
   }
 }
 
-// For Astro's SSG
-export const getGistPaths = async () => {
+/**
+ * Gets paths for all markdown gists (for Astro's SSG)
+ */
+export const getGistPaths = async (): Promise<string[]> => {
   const gists = await getGists()
+
   return gists
-    .filter((gist) => {
-      return Object.keys(gist.files).some((key) => {
-        return gist.files[key].type === 'text/markdown'
-      })
-    })
+    .filter((gist) =>
+      Object.values(gist.files).some((file) => file.type === 'text/markdown'),
+    )
     .map((gist) => {
-      const file = Object.keys(gist.files)[0]
-      const firstFileName = file.split('.')[0]
-      return slugify(firstFileName) // Return just the slugified filename
+      const firstFile = Object.values(gist.files)[0]
+      const firstFileName = firstFile.filename.split('.')[0]
+      return slugify(firstFileName)
     })
 }
 
-export const getMarkdownGists = async () => {
+/**
+ * Gets and processes all markdown gists with their content
+ */
+export const getMarkdownGists = async (): Promise<Gist[]> => {
   const gists = await getGists()
+
+  const markdownGists = gists.filter((gist) =>
+    Object.values(gist.files).some((file) => file.type === 'text/markdown'),
+  )
+
   return Promise.all(
-    gists
-      .filter((gist) => {
-        return Object.keys(gist.files).some((key) => {
-          return gist.files[key].type === 'text/markdown'
-        })
-      })
-      .map(async (gist) => {
-        const file = Object.keys(gist.files)[0]
-        const firstFileName = file.split('.')[0]
-        const rawUrl = gist.files[file].raw_url
+    markdownGists.map(async (gist) => {
+      try {
+        const firstFile = Object.values(gist.files)[0]
+        const firstFileName = firstFile.filename.split('.')[0]
+        const rawUrl = firstFile.raw_url
         const articleDate = convertDate(gist.created_at)
         const rawContent = await fetchRawUrl(rawUrl)
-        const { data: metaData, content: markdownContent } =
-          await matter(rawContent)
+
+        // Process frontmatter
+        const { data: metaData, content: markdownContent } = matter(rawContent)
         const readingTime = await calculateReadingTime(markdownContent)
+
+        // Process tags if they exist
+        const tags = metaData.tags
+          ? typeof metaData.tags === 'string'
+            ? metaData.tags.split(',')
+            : metaData.tags
+          : []
+
         return {
           ...gist,
           markdownFileName: slugify(firstFileName),
           rawUrl,
           title: firstFileName,
           articleDate,
-          rawContent: rawContent,
-          metaData: { ...metaData, tags: metaData.tags?.split(',') || [] },
+          rawContent,
+          metaData: { ...metaData, tags },
           markdownContent,
           readingTime,
         }
-      }),
+      } catch (error) {
+        console.error(`Error processing gist ${gist.id}:`, error)
+        return gist // Return the original gist without enhancements
+      }
+    }),
   )
 }
 
+/**
+ * Fetches comments for a specific gist
+ */
 export const getCommentsByGist = async (gist: Gist): Promise<Comment[]> => {
-  return await fetch(gist.comments_url, {
-    headers: HEADER,
-  }).then((res) => res.json())
+  try {
+    const response = await fetch(gist.comments_url, { headers: HEADERS })
+
+    if (!response.ok) {
+      console.error(
+        `GitHub API error: ${response.status} ${response.statusText}`,
+      )
+      return []
+    }
+
+    return (await response.json()) as Comment[]
+  } catch (error) {
+    console.error(`Failed to fetch comments for gist ${gist.id}:`, error)
+    return []
+  }
 }
 
-export const getGithubUser = async () => {
-  return await fetch(`https://api.github.com/users/${GITHUB_NAME}`, {
-    headers: HEADER,
-  }).then((res) => res.json())
+/**
+ * Fetches GitHub user details
+ */
+export const getGithubUser = async (): Promise<UserDetail | null> => {
+  try {
+    const response = await fetch(USER_ENDPOINT, { headers: HEADERS })
+
+    if (!response.ok) {
+      console.error(
+        `GitHub API error: ${response.status} ${response.statusText}`,
+      )
+      return null
+    }
+
+    return (await response.json()) as UserDetail
+  } catch (error) {
+    console.error('Failed to fetch GitHub user:', error)
+    return null
+  }
 }
 
-export const getUserAvatar = async () => {
+/**
+ * Returns the user's avatar URL
+ */
+export const getUserAvatar = (): string => {
   return `https://github.com/${GITHUB_NAME}.png`
 }
