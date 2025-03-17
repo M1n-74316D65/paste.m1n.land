@@ -1,10 +1,34 @@
 ---
-// src/pages/blog/[slug].astro
+// src/pages/[...slug].astro
 import {
   getMarkdownGists,
   getCommentsByGist,
   getGistPaths,
 } from '@/utils/services'
+import { unified } from 'unified'
+import remarkParse from 'remark-parse'
+import remarkRehype from 'remark-rehype'
+import rehypeStringify from 'rehype-stringify'
+import Layout from '@/layouts/BlogPost.astro'
+
+// Helper function to format dates as "7 Oct 2024"
+function formatDate(dateString: string): string {
+  const date = new Date(dateString)
+  const day = date.getDate()
+  const month = date.toLocaleString('default', { month: 'short' })
+  const year = date.getFullYear()
+  return `${day} ${month} ${year}`
+}
+
+// Helper function to render markdown to HTML
+async function renderMarkdown(content: string): Promise<string> {
+  const result = await unified()
+    .use(remarkParse)
+    .use(remarkRehype)
+    .use(rehypeStringify)
+    .process(content)
+  return result.toString()
+}
 
 // Define the correct return type for getStaticPaths with properly formatted return value
 export async function getStaticPaths() {
@@ -33,43 +57,63 @@ if (!article) {
 }
 
 const comments = await getCommentsByGist(article)
+
+// Process all comment bodies to convert markdown to HTML
+const processedComments = await Promise.all(
+  comments.map(async (comment) => ({
+    ...comment,
+    renderedBody: await renderMarkdown(comment.body),
+  })),
+)
+
+// Format the date in the desired format
+const formattedDate = formatDate(article.created_at)
+
+// Create frontmatter object to pass to the Layout
+const frontmatter = {
+  title: article.description,
+  pubDate: formattedDate,
+}
 ---
 
-<div class="mb-6 w-full rounded-lg bg-white p-6 shadow-lg dark:bg-gray-800">
-  <h1 class="mb-4 text-3xl font-bold dark:text-white">{article.description}</h1>
+<Layout frontmatter={frontmatter}>
+  <!-- The post content goes here, which will be placed in the slot of the Layout -->
+  <div class="mb-6">
+    <!-- We don't need to repeat the title since PostInfo in the layout will display it -->
+    <div set:html={article.markdownContent || ''} />
+  </div>
 
-  <!-- Use the correct property from your Gist type -->
-  <div
-    class="prose max-w-none dark:prose-invert"
-    set:html={article.markdownContent || ''}
-  />
-</div>
+  {
+    comments.length > 0 && (
+      <div class="my-10">
+        <h2 class="mb-6 text-2xl font-bold">Comments</h2>
 
-{
-  comments.length > 0 && (
-    <h1 class="text-center text-2xl font-bold text-gray-600 dark:text-white">
-      Comments
-    </h1>
-  )
-}
-
-{
-  comments.map((comment) => (
-    <div class="mb-4 w-full rounded-lg bg-white p-6 shadow-lg dark:bg-gray-800">
-      <div class="mb-4 flex items-center">
-        <img
-          src={`https://github.com/${comment.user.login}.png`}
-          alt={comment.user.login}
-          class="mr-4 h-10 w-10 rounded-full"
-        />
-        <div>
-          <div class="font-semibold dark:text-white">{comment.user.login}</div>
-          <div class="text-sm text-gray-500">
-            {new Date(comment.created_at).toLocaleDateString()}
-          </div>
+        <div class="space-y-6">
+          {processedComments.map((comment) => (
+            <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+              <div class="mb-4 flex items-center">
+                <img
+                  src={`https://github.com/${comment.user.login}.png`}
+                  alt={comment.user.login}
+                  class="mr-4 h-10 w-10 rounded-full"
+                />
+                <div>
+                  <div class="font-semibold text-text dark:text-darkText">
+                    {comment.user.login}
+                  </div>
+                  <div class="text-sm text-gray-500">
+                    {formatDate(comment.created_at)}
+                  </div>
+                </div>
+              </div>
+              <div
+                class="prose dark:prose-invert"
+                set:html={comment.renderedBody}
+              />
+            </div>
+          ))}
         </div>
       </div>
-      <div class="prose max-w-none dark:prose-invert" set:html={comment.body} />
-    </div>
-  ))
-}
+    )
+  }
+</Layout>
