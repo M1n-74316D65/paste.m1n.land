@@ -1,0 +1,25 @@
+---
+// List.astro
+import PostPreview from '@/components/PostPreview.astro'
+import type { Gist } from '@/utils/services'
+import Base from '@/layouts/Base.astro'
+import config from '@/config'
+interface Props {
+  data: Gist[]
+}
+
+const { data } = Astro.props
+---
+
+{
+  data.map((gist, index) => (
+    <PostPreview
+      key={index}
+      url={gist.html_url}
+      title={gist.title}
+      description={gist.description}
+      pubDate={gist.articleDate}
+      markdownFileName={gist.markdownFileName}
+    />
+  ))
+}

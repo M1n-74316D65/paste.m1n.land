@@ -1,5 +1,5 @@
 ---
-const { url, title, description, pubDate } = Astro.props
+const { url, title, description, pubDate, markdownFileName } = Astro.props
 
 // Function to limit description to 10 words
 const limitDescription = (text: string) => {
@@ -14,7 +14,7 @@ const truncatedDescription = limitDescription(description)
 ---
 
 <a
-  href={url}
+  href={`/${markdownFileName}`}
   class="rounded-base border-2 border-border bg-main p-4 text-text shadow-light transition-all last:mb-0 hover:translate-x-boxShadowX hover:translate-y-boxShadowY hover:shadow-none dark:border-darkBorder dark:shadow-dark dark:hover:shadow-none"
 >
   <h2 class="mt-1 text-xl font-heading w500:text-lg">

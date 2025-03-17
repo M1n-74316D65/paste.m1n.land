@@ -1,21 +1,75 @@
 ---
-import { getCollection } from 'astro:content'
+// src/pages/blog/[slug].astro
+import {
+  getMarkdownGists,
+  getCommentsByGist,
+  getGistPaths,
+} from '@/utils/services'
 
-import Layout from '@/layouts/BlogPost.astro'
-
+// Define the correct return type for getStaticPaths with properly formatted return value
 export async function getStaticPaths() {
-  const blogEntries = await getCollection('posts')
+  const markdownFileNames = await getGistPaths()
 
-  return blogEntries.map((entry) => ({
-    params: { slug: entry.slug },
-    props: { entry }
+  // Return the correct format - each fileName should be a simple string
+  return markdownFileNames.map((fileName) => ({
+    params: { slug: fileName },
   }))
 }
 
-const { entry } = Astro.props
-const { Content } = await entry.render()
+// Correctly access the slug parameter
+const { slug } = Astro.params
+
+// Type guard to ensure slug is defined
+if (!slug) {
+  return Astro.redirect('/404')
+}
+
+const markdownGists = await getMarkdownGists()
+const article = markdownGists.find((gist) => gist.markdownFileName === slug)
+
+// Handle 404 case
+if (!article) {
+  return Astro.redirect('/404')
+}
+
+const comments = await getCommentsByGist(article)
 ---
 
-<Layout frontmatter={entry.data}>
-  <Content />
-</Layout>
+<div class="mb-6 w-full rounded-lg bg-white p-6 shadow-lg dark:bg-gray-800">
+  <h1 class="mb-4 text-3xl font-bold dark:text-white">{article.description}</h1>
+
+  <!-- Use the correct property from your Gist type -->
+  <div
+    class="prose max-w-none dark:prose-invert"
+    set:html={article.markdownContent || ''}
+  />
+</div>
+
+{
+  comments.length > 0 && (
+    <h1 class="text-center text-2xl font-bold text-gray-600 dark:text-white">
+      Comments
+    </h1>
+  )
+}
+
+{
+  comments.map((comment) => (
+    <div class="mb-4 w-full rounded-lg bg-white p-6 shadow-lg dark:bg-gray-800">
+      <div class="mb-4 flex items-center">
+        <img
+          src={`https://github.com/${comment.user.login}.png`}
+          alt={comment.user.login}
+          class="mr-4 h-10 w-10 rounded-full"
+        />
+        <div>
+          <div class="font-semibold dark:text-white">{comment.user.login}</div>
+          <div class="text-sm text-gray-500">
+            {new Date(comment.created_at).toLocaleDateString()}
+          </div>
+        </div>
+      </div>
+      <div class="prose max-w-none dark:prose-invert" set:html={comment.body} />
+    </div>
+  ))
+}
