@@ -178,6 +178,12 @@ export const getMarkdownGists = async (): Promise<Gist[]> => {
       try {
         const firstFile = Object.values(gist.files)[0]
         const firstFileName = firstFile.filename.split('.')[0]
+        const formattedTitle = firstFileName
+          .split('-')
+          .map((word, index) =>
+            index === 0 ? word.charAt(0).toUpperCase() + word.slice(1) : word,
+          )
+          .join(' ')
         const rawUrl = firstFile.raw_url
         const articleDate = convertDate(gist.created_at)
         const rawContent = await fetchRawUrl(rawUrl)
@@ -197,7 +203,7 @@ export const getMarkdownGists = async (): Promise<Gist[]> => {
           ...gist,
           markdownFileName: slugify(firstFileName),
           rawUrl,
-          title: firstFileName,
+          title: formattedTitle,
           articleDate,
           rawContent,
           metaData: { ...metaData, tags },
