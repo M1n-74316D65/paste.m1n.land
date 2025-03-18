@@ -3,6 +3,8 @@ import remarkParse from 'remark-parse'
 import remarkRehype from 'remark-rehype'
 import rehypeStringify from 'rehype-stringify'
 import rehypeRaw from 'rehype-raw'
+import rehypeExpressiveCode from 'rehype-expressive-code'
+import config from '@/config'
 
 /**
  * Formats a date string to "7 Oct 2024" format
@@ -16,13 +18,22 @@ export const formatDate = (dateString: string): string => {
 }
 
 /**
- * Renders markdown content to HTML
+ * Renders markdown content to HTML with syntax highlighting
  */
 export const renderMarkdown = async (content: string): Promise<string> => {
   const result = await unified()
     .use(remarkParse)
     .use(remarkRehype, { allowDangerousHtml: true })
     .use(rehypeRaw)
+    .use(rehypeExpressiveCode, {
+      themes: [config.themes.dark, config.themes.light],
+      styleOverrides: {
+        borderRadius: '0.5rem',
+        frames: {
+          frameBoxShadowCssValue: '0 0 0.5rem rgba(0, 0, 0, 0.1)',
+        },
+      },
+    })
     .use(rehypeStringify)
     .process(content || '')
 
