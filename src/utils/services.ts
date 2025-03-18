@@ -76,6 +76,23 @@ export interface Comment {
   created_at: string
 }
 
+// Cache implementation
+interface CacheItem<T> {
+  data: T
+  timestamp: number
+}
+
+const cache: {
+  markdownGists?: CacheItem<Gist[]>
+  comments: Record<string, CacheItem<Comment[]>>
+} = {
+  comments: {},
+}
+
+// Cache durations in milliseconds
+const MARKDOWN_GISTS_CACHE_DURATION = 15 * 60 * 1000 // 15 minutes
+const COMMENTS_CACHE_DURATION = 60 * 60 * 1000 // 1 hour
+
 // Config
 const GITHUB_NAME = import.meta.env.GITHUB_NAME
 const GITHUB_TOKEN = import.meta.env.GITHUB_TOKEN
@@ -165,15 +182,25 @@ export const getGistPaths = async (): Promise<string[]> => {
 
 /**
  * Gets and processes all markdown gists with their content
+ * Results are cached for 15 minutes
  */
 export const getMarkdownGists = async (): Promise<Gist[]> => {
+  // Check if we have a valid cache
+  const now = Date.now()
+  if (
+    cache.markdownGists &&
+    now - cache.markdownGists.timestamp < MARKDOWN_GISTS_CACHE_DURATION
+  ) {
+    return cache.markdownGists.data
+  }
+
   const gists = await getGists()
 
   const markdownGists = gists.filter((gist) =>
     Object.values(gist.files).some((file) => file.type === 'text/markdown'),
   )
 
-  return Promise.all(
+  const result = await Promise.all(
     markdownGists.map(async (gist) => {
       try {
         const firstFile = Object.values(gist.files)[0]
@@ -216,12 +243,32 @@ export const getMarkdownGists = async (): Promise<Gist[]> => {
       }
     }),
   )
+
+  // Update the cache
+  cache.markdownGists = {
+    data: result,
+    timestamp: now,
+  }
+
+  return result
 }
 
 /**
  * Fetches comments for a specific gist
+ * Results are cached for 1 hour
  */
 export const getCommentsByGist = async (gist: Gist): Promise<Comment[]> => {
+  const now = Date.now()
+  const cacheKey = gist.id
+
+  // Check if we have a valid cache for this gist's comments
+  if (
+    cache.comments[cacheKey] &&
+    now - cache.comments[cacheKey].timestamp < COMMENTS_CACHE_DURATION
+  ) {
+    return cache.comments[cacheKey].data
+  }
+
   try {
     const response = await fetch(gist.comments_url, { headers: HEADERS })
 
@@ -232,7 +279,15 @@ export const getCommentsByGist = async (gist: Gist): Promise<Comment[]> => {
       return []
     }
 
-    return (await response.json()) as Comment[]
+    const comments = (await response.json()) as Comment[]
+
+    // Update the cache
+    cache.comments[cacheKey] = {
+      data: comments,
+      timestamp: now,
+    }
+
+    return comments
   } catch (error) {
     console.error(`Failed to fetch comments for gist ${gist.id}:`, error)
     return []
