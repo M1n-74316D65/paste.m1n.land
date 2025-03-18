@@ -1,13 +1,19 @@
 ---
 interface Props {
   url: string
-  title: string
+  title?: string
   description: string
-  pubDate: string
-  markdownFileName: string
+  pubDate?: string
+  markdownFileName?: string
 }
 
-const { url, title, description, pubDate, markdownFileName } = Astro.props
+const {
+  url,
+  title = 'Why no title? (•ิ_•ิ)?',
+  description,
+  pubDate = 'No date ¯\_(ツ)_/¯?',
+  markdownFileName = 'LOL (•ิ_•ิ)?',
+} = Astro.props
 
 /**
  * Truncates a text to a specified number of words
@@ -33,7 +39,7 @@ const truncatedDescription = truncateText(description)
     </h2>
 
     <p
-      class="mb-5 mt-3 flex-grow rounded-lg bg-white p-2 dark:bg-secondaryBlack dark:text-bg w500:text-sm"
+      class="mb-5 mt-3 flex-grow rounded-lg bg-white p-2 dark:bg-secondaryBlack dark:text-white w500:text-sm"
     >
       {truncatedDescription}
     </p>
