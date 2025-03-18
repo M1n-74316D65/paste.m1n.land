@@ -30,7 +30,7 @@
 
 ## 📍 Overview
 
-A pastebin service config to hosted in **Vercel** and use Github **Gists**.
+A personal pastebin config to hosted in **Vercel** and use Github **Gists**.
 
 ---
 
