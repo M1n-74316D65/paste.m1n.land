@@ -1,0 +1,49 @@
+---
+// src/components/CommentList.astro
+import { formatDate } from '@/utils/helpers'
+import type { Comment } from '@/utils/services'
+
+interface Props {
+  comments: (Comment & { renderedBody?: string })[]
+}
+
+const { comments } = Astro.props
+---
+
+<section class="my-10">
+  <h2 class="mb-6 text-2xl font-bold">Comments</h2>
+
+  <div class="space-y-6">
+    {
+      comments.map((comment) => (
+        <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <header class="mb-4 flex items-center">
+            <img
+              src={
+                comment.user.avatar_url ||
+                `https://github.com/${comment.user.login}.png`
+              }
+              alt={`${comment.user.login}'s avatar`}
+              class="mr-4 h-10 w-10 rounded-full"
+              loading="lazy"
+              width="40"
+              height="40"
+            />
+            <div>
+              <h3 class="font-semibold text-text dark:text-darkText">
+                {comment.user.login}
+              </h3>
+              <time datetime={comment.created_at} class="text-sm text-gray-500">
+                {formatDate(comment.created_at)}
+              </time>
+            </div>
+          </header>
+          <div
+            class="prose max-w-none dark:prose-invert"
+            set:html={comment.renderedBody}
+          />
+        </div>
+      ))
+    }
+  </div>
+</section>

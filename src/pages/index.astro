@@ -17,9 +17,7 @@ type MetaProps = {
   <main>
     {
       articles.length > 0 ? (
-        <div class="grid grid-cols-3 gap-5 sm:grid-cols-1 md:grid-cols-2">
-          <List data={articles} />
-        </div>
+        <List data={articles} />
       ) : (
         <div class="flex min-h-[50vh] items-center justify-center">
           <h1 class="text-2xl font-bold text-gray-500">No Gists Found</h1>

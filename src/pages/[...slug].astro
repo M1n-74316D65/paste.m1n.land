@@ -3,51 +3,12 @@ import {
   getMarkdownGists,
   getCommentsByGist,
   getGistPaths,
+  type Gist,
+  type Comment,
 } from '@/utils/services'
-import { unified } from 'unified'
-import remarkParse from 'remark-parse'
-import remarkRehype from 'remark-rehype'
-import rehypeStringify from 'rehype-stringify'
-import rehypeRaw from 'rehype-raw'
 import Layout from '@/layouts/BlogPost.astro'
-
-// Define interfaces for better type safety
-interface Comment {
-  body: string
-  user: {
-    login: string
-  }
-  created_at: string
-  renderedBody?: string
-}
-
-interface Article {
-  description: string
-  created_at: string
-  markdownFileName: string
-  markdownContent?: string
-}
-
-// Helper function to format dates as "7 Oct 2024"
-const formatDate = (dateString: string): string => {
-  const date = new Date(dateString)
-  const day = date.getDate()
-  const month = date.toLocaleString('default', { month: 'short' })
-  const year = date.getFullYear()
-  return `${day} ${month} ${year}`
-}
-
-// Helper function to render markdown to HTML
-const renderMarkdown = async (content: string): Promise<string> => {
-  const result = await unified()
-    .use(remarkParse)
-    .use(remarkRehype, { allowDangerousHtml: true })
-    .use(rehypeRaw)
-    .use(rehypeStringify)
-    .process(content || '')
-
-  return result.toString()
-}
+import CommentList from '@/components/CommentList.astro'
+import { formatDate, renderMarkdown } from '@/utils/helpers'
 
 // Define the return type for getStaticPaths
 export async function getStaticPaths() {
@@ -66,37 +27,44 @@ if (!slug) {
   return Astro.redirect('/404')
 }
 
-// Fetch data
-const markdownGists = await getMarkdownGists()
-const article = markdownGists.find((gist) => gist.markdownFileName === slug)
+// Fetch data with error handling
+let gist: Gist | undefined
+let processedComments: (Comment & { renderedBody?: string })[] = []
 
-// Handle 404 case
-if (!article) {
-  return Astro.redirect('/404')
+try {
+  const markdownGists = await getMarkdownGists()
+  gist = markdownGists.find((g) => g.markdownFileName === slug)
+
+  // Handle 404 case
+  if (!gist) {
+    return Astro.redirect('/404')
+  }
+
+  // Fetch and process comments
+  const comments = await getCommentsByGist(gist)
+  processedComments = await Promise.all(
+    comments.map(async (comment) => ({
+      ...comment,
+      renderedBody: await renderMarkdown(comment.body),
+    })),
+  )
+} catch (error) {
+  console.error('Error fetching article data:', error)
+  return Astro.redirect('/error')
 }
-
-// Fetch and process comments
-const comments = await getCommentsByGist(article)
-const processedComments = await Promise.all(
-  comments.map(async (comment) => ({
-    ...comment,
-    renderedBody: await renderMarkdown(comment.body),
-  })),
-)
-
-// Format article date
-const formattedDate = formatDate(article.created_at)
 
 // Create frontmatter object
 const frontmatter = {
-  title: article.description,
-  pubDate: formattedDate,
+  title: gist.title || gist.description,
+  pubDate: formatDate(gist.created_at),
+  // Add additional metadata if available
+  ...(gist.metaData?.category && { category: gist.metaData.category }),
+  ...(gist.metaData?.tags && { tags: gist.metaData.tags }),
+  ...(gist.readingTime && { readingTime: gist.readingTime }),
 }
 
 // Process the main article content
-const renderedArticleContent = await renderMarkdown(
-  article.markdownContent || '',
-)
+const renderedArticleContent = await renderMarkdown(gist.markdownContent || '')
 ---
 
 <Layout frontmatter={frontmatter}>
@@ -107,41 +75,5 @@ const renderedArticleContent = await renderMarkdown(
     />
   </article>
 
-  {
-    processedComments.length > 0 && (
-      <section class="my-10">
-        <h2 class="mb-6 text-2xl font-bold">Comments</h2>
-
-        <div class="space-y-6">
-          {processedComments.map((comment) => (
-            <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-              <header class="mb-4 flex items-center">
-                <img
-                  src={`https://github.com/${comment.user.login}.png`}
-                  alt={`${comment.user.login}'s avatar`}
-                  class="mr-4 h-10 w-10 rounded-full"
-                  loading="lazy"
-                />
-                <div>
-                  <h3 class="font-semibold text-text dark:text-darkText">
-                    {comment.user.login}
-                  </h3>
-                  <time
-                    datetime={comment.created_at}
-                    class="text-sm text-gray-500"
-                  >
-                    {formatDate(comment.created_at)}
-                  </time>
-                </div>
-              </header>
-              <div
-                class="prose max-w-none dark:prose-invert"
-                set:html={comment.renderedBody}
-              />
-            </div>
-          ))}
-        </div>
-      </section>
-    )
-  }
+  {processedComments.length > 0 && <CommentList comments={processedComments} />}
 </Layout>
