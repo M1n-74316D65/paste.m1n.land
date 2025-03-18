@@ -1,6 +1,7 @@
 ---
 import config from '@/config'
-import { ViewTransitions } from 'astro:transitions'
+import { fade } from 'astro:transitions'
+import Analytics from '@vercel/analytics/astro'
 
 import BaseHead from '@/components/BaseHead.astro'
 import Nav from '@/components/Nav.astro'
@@ -13,10 +14,10 @@ const {
 } = Astro.props
 ---
 
-<html lang={config.lang}>
+<html lang={config.lang} transition:animate={fade()}>
   <head>
+    <Analytics />
     <BaseHead title={title} description={description} />
-    <ViewTransitions />
   </head>
   <body
     class="mx-auto max-w-[1200px] bg-bg px-5 font-base text-text scrollbar scrollbar-thumb-black dark:bg-darkBg dark:text-darkText dark:scrollbar-thumb-white"
